@@ -17,27 +17,25 @@ class AutoMoDModelForCausalLM:
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         model_class_name = cls.load_model_conf(args[0])
-        # Utilizza il mapping per ottenere il nome della classe del modello
+        # Uses Mapping to get the model class name
         if not model_class_name:
             raise ValueError(
                 f"The model {args[0]} was not found, this mean it has not been mapped yet, please open an issue on the github repository")
 
-        # Ottieni la classe del modello utilizzando il suo nome
+        # Get the model class using its name
         model_class = globals()[model_class_name]
 
-        # Restituisci l'istanza del modello
         return model_class.from_pretrained(*args, **kwargs)
 
     @classmethod
     def from_config(cls, *args, **kwargs):
         model_class_name = cls.load_model_conf(args[0])
-        # Utilizza il mapping per ottenere il nome della classe del modello
+        # Uses Mapping to get the model class name
         if not model_class_name:
             raise ValueError(
                 f"The model {args[0]} was not found, this mean it has not been mapped yet, please open an issue on the github repository")
 
-        # Ottieni la classe del modello utilizzando il suo nome
+        # Get the model class using its name
         model_class = globals()[model_class_name]
 
-        # Restituisci l'istanza del modello
         return model_class.from_config(*args, **kwargs)

@@ -96,10 +96,10 @@ def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedM
         new_layers.append(new_layer)
 
     model.model.layers = new_layers
-    # Prendi il nome della classe corrente
+    # Take the class name
     class_name = model.__class__.__name__
 
-    # Inserisci 'MoD' prima di 'For'
+    # Insert MoD before the For
     if 'For' in class_name:
         parts = class_name.split('For', 1)
         modified_class_name = parts[0] + 'MoDFor' + parts[1]
