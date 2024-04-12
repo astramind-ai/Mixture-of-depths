@@ -1,4 +1,4 @@
-import os
+# inspired by  https://github.com/kyegomez/Mixture-of-Depths
 
 import torch
 import torch.nn as nn
@@ -55,7 +55,7 @@ class MoD(nn.Module):
             selected_position_ids = position_ids[i][selected_mask[i]].unsqueeze(0)
 
             if selected_tokens.size(0) > 0:
-                # Gestione dinamica del cache_position
+                # Dynamic cache management
                 if cache_position is not None:
                     selected_cache_position = cache_position[selected_mask[i]]
                     processed_tokens[i][selected_mask[i]] = self.block(
@@ -104,9 +104,8 @@ def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedM
         parts = class_name.split('For', 1)
         modified_class_name = parts[0] + 'MoDFor' + parts[1]
     else:
-        modified_class_name = 'MoD' + class_name  # Se non trova 'For', aggiunge 'MoD' all'inizio
+        modified_class_name = 'MoD' + class_name  # If it doesn't find any i prepends MoD
 
-    # Ora puoi impostare l'attributo __name__ della classe dell'istanza
     model.__class__.__name__ = modified_class_name
 
     return model
