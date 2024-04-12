@@ -1,1 +1,1 @@
-from .MoD import MoD, apply_to_hf
+from .MoD import MoD, apply_mod_to_hf

@@ -1,8 +1,7 @@
-from typing import Optional, Tuple
-
 import torch
 import torch.nn as nn
-from torch import Tensor
+from typing import Optional, Tuple, Any
+
 
 class TokenRouter(nn.Module):
     def __init__(self, embed_dim):
@@ -15,6 +14,7 @@ class TokenRouter(nn.Module):
         )  # [batch_size, seq_len]
         return weights
 
+
 class MoD(nn.Module):
     def __init__(self, capacity, block):
         super().__init__()
@@ -24,61 +24,67 @@ class MoD(nn.Module):
         self.training_step = 0
 
     def forward(self,
-                x: Tensor,
-                causal_mask,
-                position_ids,
-                past_key_values,
-                output_attentions,
-                use_cache,
-                cache_position,
-                **kwargs,
-    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+                x: torch.Tensor,
+                causal_mask: torch.Tensor,
+                position_ids: torch.Tensor,
+                past_key_values: Optional[Tuple[torch.Tensor, torch.Tensor]],
+                output_attentions: bool,
+                use_cache: bool,
+                cache_position: Optional[torch.Tensor] = None,
+                **kwargs: Any
+                ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         b, s, d = x.shape
         weights = self.router(x)
         if self.router.training:
-            # this is done to avoid shocking the model with a sudden change in capacity
             self.training_step += 1 if self.training_step < 1000 else 999
-            self.capacity = 0.125 + ((1-0.125) * (1. / (self.training_step)))
-        # Compute B-th percentile for router weights to determine the capacity threshold
+            self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
+
         k = int(self.capacity * s)
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
-
-        # Determine which tokens exceed the threshold
         selected_mask = weights > threshold.unsqueeze(-1)
 
-        # Process only selected tokens through the block
         processed_tokens = torch.zeros_like(x)
         for i in range(b):
-            # Process tokens for each block
             selected_tokens = x[i][selected_mask[i]]
-            position_ids = position_ids[i][selected_mask[i]].unsqueeze(0)
-            cache_position = cache_position[selected_mask[i]]
+            selected_position_ids = position_ids[i][selected_mask[i]].unsqueeze(0)
+
             if selected_tokens.size(0) > 0:
-                processed_tokens[i][selected_mask[i]] = self.block(
-                    selected_tokens.unsqueeze(0),
-                    attention_mask=causal_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                    **kwargs
-                ) * weights[i][selected_mask[i]]  # TODO: Check if this works
+                # Gestione dinamica del cache_position
+                if cache_position is not None:
+                    selected_cache_position = cache_position[selected_mask[i]]
+                    processed_tokens[i][selected_mask[i]] = self.block(
+                        selected_tokens.unsqueeze(0),
+                        attention_mask=causal_mask,
+                        position_ids=selected_position_ids,
+                        past_key_value=past_key_values,
+                        output_attentions=output_attentions,
+                        use_cache=use_cache,
+                        cache_position=selected_cache_position,
+                        **kwargs
+                    )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
+                else:
+                    processed_tokens[i][selected_mask[i]] = self.block(
+                        selected_tokens.unsqueeze(0),
+                        attention_mask=causal_mask,
+                        position_ids=selected_position_ids,
+                        past_key_value=past_key_values,
+                        output_attentions=output_attentions,
+                        use_cache=use_cache,
+                        **kwargs
+                    )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
 
-        # Combine processed tokens with unprocessed ones
-        output = processed_tokens + (
-                x * (~selected_mask).unsqueeze(-1).to(x.dtype)  # TODO: Warn?
-        )
-        return output
+        output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
+        return (output,) if len(output.shape) == 3 else (output.unsqueeze(0),)
 
-def apply_to_hf(model, enabled=True):
+
+def apply_mod_to_hf(model, enabled=True):
     if not enabled:
         return model
 
     new_layers = nn.ModuleList()
     for i, layer in enumerate(model.model.layers):
-        if i %2 != 0:
+        if i % 2 != 0:
             new_layer = MoD(0.125, layer)
         else:
             new_layer = layer
