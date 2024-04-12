@@ -1,6 +1,11 @@
+import os
+
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Any
+
+from transformers import PreTrainedModel
+
 
 
 class TokenRouter(nn.Module):
@@ -78,7 +83,7 @@ class MoD(nn.Module):
         return (output,) if len(output.shape) == 3 else (output.unsqueeze(0),)
 
 
-def apply_mod_to_hf(model, enabled=True):
+def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedModel:
     if not enabled:
         return model
 
@@ -91,4 +96,17 @@ def apply_mod_to_hf(model, enabled=True):
         new_layers.append(new_layer)
 
     model.model.layers = new_layers
+    # Prendi il nome della classe corrente
+    class_name = model.__class__.__name__
+
+    # Inserisci 'MoD' prima di 'For'
+    if 'For' in class_name:
+        parts = class_name.split('For', 1)
+        modified_class_name = parts[0] + 'MoDFor' + parts[1]
+    else:
+        modified_class_name = 'MoD' + class_name  # Se non trova 'For', aggiunge 'MoD' all'inizio
+
+    # Ora puoi impostare l'attributo __name__ della classe dell'istanza
+    model.__class__.__name__ = modified_class_name
+
     return model
