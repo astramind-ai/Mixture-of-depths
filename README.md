@@ -47,10 +47,10 @@ model = AutoMoDModelForCausalLM.from_pretrained('path_to_your_model')
 We welcome contributions from the community, whether it's adding new features, improving documentation, or reporting bugs. Please refer to our contribution guidelines before making a pull request.
 
 ## 📜 License
-BitMat is open-sourced under the Apache-2.0 license.
+This repo is open-sourced under the Apache-2.0 license.
 
 ## Citation
-If you use BitMat in your research, please cite it using the following Bibtex entry:
+If you use our code in your research, please cite it using the following Bibtex entry:
 
 ```bibtex
 @article{MoD2024,
@@ -61,10 +61,4 @@ If you use BitMat in your research, please cite it using the following Bibtex en
 }
 ```
 ## Support
-For questions, issues, or support regarding BitMat, please open an issue on our GitHub repository.
-
-## Acknowledgments
-Special thanks to the Triton community and the authors of the "1bit-LLM Era" paper for their groundbreaking work and inspiration.
-
-Also thanks to the developer of [BitDelta](https://github.com/FasterDecoding/BitDelta/) and [UnSloth](https://github.com/unslothai/unsloth) since part of the code is based on their work.
-
+For questions, issues, or support, please open an issue on our GitHub repository.
