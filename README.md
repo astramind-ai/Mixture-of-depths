@@ -13,6 +13,8 @@ This is an unofficial implementation for the paper [Mixture-of-Depths: Dynamical
 | LLama2  | ✅  |
 | Gemma  | ✅  |
 | Solar  | ❌  |
+| Baichuan  | ❌  |
+| Solar  | ❌  |
 
 ## 💾 Installation
 ```bash
