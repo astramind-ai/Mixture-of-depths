@@ -88,12 +88,20 @@ def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedM
         return model
 
     new_layers = nn.ModuleList()
-    for i, layer in enumerate(model.model.layers):
-        if i % 2 != 0:
-            new_layer = MoD(0.125, layer)
-        else:
-            new_layer = layer
-        new_layers.append(new_layer)
+    if (model.config.architectures[0] == 'BloomForCausalLM') or (model.config.architectures[0] == 'FalconMoDForCausalLM'):
+        for i, layer in enumerate(model.transformers.h):
+            if i % 2 != 0:
+                new_layer = MoD(0.125, layer)
+            else:
+                new_layer = layer
+            new_layers.append(new_layer)
+    else:
+        for i, layer in enumerate(model.model.layers):
+            if i % 2 != 0:
+                new_layer = MoD(0.125, layer)
+            else:
+                new_layer = layer
+            new_layers.append(new_layer)
 
     model.model.layers = new_layers
     # Take the class name

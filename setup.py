@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mixture-of-depth',
-    version='1.0.0',
+    version='1.1.1',
     author='Marco Lironi',
     author_email='marcolironi@astramind.ai',
     description='Unofficial implementation for the paper "Mixture-of-Depths: Dynamically allocating compute in transformer-based language models"',

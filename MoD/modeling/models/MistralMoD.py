@@ -44,6 +44,7 @@ from transformers.utils import (
 )
 from transformers.models.mistral.configuration_mistral import MistralConfig
 
+from MoD import MoD
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
@@ -162,81 +163,6 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
-
-
-class TokenRouter(nn.Module):
-    def __init__(self, embed_dim):
-        super().__init__()
-        self.weight_predictor = nn.Linear(embed_dim, 1)
-
-    def forward(self, x):
-        weights = self.weight_predictor(x).squeeze(
-            -1
-        )  # [batch_size, seq_len]
-        return weights
-
-
-class MoD(nn.Module):
-    def __init__(self, capacity, block):
-        super().__init__()
-        self.router = TokenRouter(block.hidden_size)
-        self.block = block
-        self.capacity = capacity
-        self.training_step = 0
-
-    def forward(self,
-                x: torch.Tensor,
-                causal_mask: torch.Tensor,
-                position_ids: torch.Tensor,
-                past_key_values: Optional[Tuple[torch.Tensor, torch.Tensor]],
-                output_attentions: bool,
-                use_cache: bool,
-                cache_position: Optional[torch.Tensor] = None,
-                **kwargs: Any
-                ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
-        b, s, d = x.shape
-        weights = self.router(x)
-        if self.router.training:
-            self.training_step += 1 if self.training_step < 1000 else 999
-            self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
-
-        k = int(self.capacity * s)
-        top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
-        threshold = top_k_values[:, -1]
-        selected_mask = weights > threshold.unsqueeze(-1)
-
-        processed_tokens = torch.zeros_like(x)
-        for i in range(b):
-            selected_tokens = x[i][selected_mask[i]]
-            selected_position_ids = position_ids[i][selected_mask[i]].unsqueeze(0)
-
-            if selected_tokens.size(0) > 0:
-                # Gestione dinamica del cache_position
-                if cache_position is not None:
-                    selected_cache_position = cache_position[selected_mask[i]]
-                    processed_tokens[i][selected_mask[i]] = self.block(
-                        selected_tokens.unsqueeze(0),
-                        attention_mask=causal_mask,
-                        position_ids=selected_position_ids,
-                        past_key_value=past_key_values,
-                        output_attentions=output_attentions,
-                        use_cache=use_cache,
-                        cache_position=selected_cache_position,
-                        **kwargs
-                    )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
-                else:
-                    processed_tokens[i][selected_mask[i]] = self.block(
-                        selected_tokens.unsqueeze(0),
-                        attention_mask=causal_mask,
-                        position_ids=selected_position_ids,
-                        past_key_value=past_key_values,
-                        output_attentions=output_attentions,
-                        use_cache=use_cache,
-                        **kwargs
-                    )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
-
-        output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
-        return (output,) if len(output.shape) == 3 else (output.unsqueeze(0),)
 
 
 
