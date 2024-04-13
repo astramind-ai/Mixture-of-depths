@@ -42,8 +42,10 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from transformers.models.qwen2_moe.configuration_qwen2_moe import Qwen2MoeConfig # noqa
-
+try:
+    from transformers.models.qwen2_moe.configuration_qwen2_moe import Qwen2MoeConfig # noqa
+except ImportError:
+    Qwen2MoeConfig = None
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func

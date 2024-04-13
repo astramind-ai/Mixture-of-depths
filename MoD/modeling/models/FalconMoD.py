@@ -25,22 +25,22 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
 from torch.nn import functional as F
 
 from ... import MoD
-from ...activations import get_activation
-from ...modeling_attn_mask_utils import (
+from transformers.activations import get_activation
+from transformers.modeling_attn_mask_utils import (
     AttentionMaskConverter,
     _prepare_4d_causal_attention_mask,
     _prepare_4d_causal_attention_mask_for_sdpa,
 )
-from ...modeling_outputs import (
+from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
-from ...modeling_utils import PreTrainedModel
-from ...pytorch_utils import is_torch_greater_or_equal_than_2_0
-from ...utils import (
+from transformers.modeling_utils import PreTrainedModel
+from transformers.pytorch_utils import is_torch_greater_or_equal_than_2_0
+from transformers.utils import (
     add_code_sample_docstrings,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
@@ -48,19 +48,17 @@ from ...utils import (
     is_flash_attn_greater_or_equal_2_10,
     logging,
 )
-from .configuration_falcon import FalconConfig
+from transformers.models.falcon.configuration_falcon import FalconConfig
 
 
 if TYPE_CHECKING:
-    from ...configuration_utils import PretrainedConfig
+    from transformers.configuration_utils import PretrainedConfig
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
 
 logger = logging.get_logger(__name__)
-
-from ..deprecated._archive_maps import FALCON_PRETRAINED_MODEL_ARCHIVE_LIST  # noqa: F401, E402
 
 
 _CHECKPOINT_FOR_DOC = "Rocketknight1/falcon-rw-1b"
