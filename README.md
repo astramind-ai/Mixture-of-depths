@@ -8,13 +8,26 @@ This is an unofficial implementation for the paper [Mixture-of-Depths: Dynamical
 
 | Model  | Supported? |
 | ------------- | ------------- |
-| Mistral  | ✅  |
-| Mixtral  | ❌  |
-| LLama2  | ✅  |
-| Gemma  | ✅  |
-| Solar  | ❌  |
-| Baichuan  | ❌  |
-| Solar  | ❌  |
+| Mistral  |  ✅ |
+| Mixtral  |  ✅ |
+| LLama  |  ✅ |
+| LLama2  |  ✅ |
+| Gemma  |  ✅ |
+| BLOOMZ  |  ✅ |
+| BLOOM  |  ✅ |
+| DeepSeek  |  ✅ |
+| Phi (1.5 & 2)  |  ✅ |
+| Qwen2  |  ✅ |
+| StarCoder2  |  ✅ |
+| Qwen2-MoE  |  ❓ |
+| Solar  |  ❓ |
+| Baichuan  |  ❌ |
+| ChatGLM3  |  ❌ |
+| InternLM  |  ❌ |
+| Olmo  |  ❌ |
+| XVERSE  |  ❌ |
+| Yi  |  ❌ |
+| Yuan  |  ❌ |
 
 ## 💾 Installation
 ```bash
