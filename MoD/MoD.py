@@ -30,9 +30,9 @@ class MoD(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
-                causal_mask: torch.Tensor,
+                attention_mask: torch.Tensor,
                 position_ids: torch.Tensor,
-                past_key_values: Optional[Tuple[torch.Tensor, torch.Tensor]],
+                past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]],
                 output_attentions: bool,
                 use_cache: bool,
                 cache_position: Optional[torch.Tensor] = None,
@@ -51,36 +51,47 @@ class MoD(nn.Module):
 
         processed_tokens = torch.zeros_like(x)
         for i in range(b):
-            selected_tokens = x[i][selected_mask[i]]
-            selected_position_ids = position_ids[i][selected_mask[i]].unsqueeze(0)
-
+            current_selected_mask = selected_mask[i]
+            selected_tokens = x[i][current_selected_mask]
+            selected_position_ids = position_ids[i][current_selected_mask].unsqueeze(0)
+            if attention_mask is not None:
+                current_causal_mask = attention_mask[i, 0]
+                current_causal_mask = current_causal_mask[current_selected_mask][:, current_selected_mask].unsqueeze(0).unsqueeze(0) #first if for the one second is for the bs
+            else:
+                current_causal_mask = None
             if selected_tokens.size(0) > 0:
                 # Dynamic cache management
                 if cache_position is not None:
                     selected_cache_position = cache_position[selected_mask[i]]
-                    processed_tokens[i][selected_mask[i]] = self.block(
+                    block_output = self.block(
                         selected_tokens.unsqueeze(0),
-                        attention_mask=causal_mask,
+                        attention_mask=current_causal_mask,
                         position_ids=selected_position_ids,
-                        past_key_value=past_key_values,
+                        past_key_value=past_key_value,
                         output_attentions=output_attentions,
                         use_cache=use_cache,
                         cache_position=selected_cache_position,
                         **kwargs
-                    )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
+                    )
+                    if len(block_output) == 2:
+                        processed_tokens[i][selected_mask[i]], cache = block_output
+                    else:
+                        processed_tokens[i][selected_mask[i]] = block_output[0]
+                        cache = None
+                    processed_tokens[i][selected_mask[i]] = processed_tokens[i][selected_mask[i]] * weights[i][selected_mask[i]].unsqueeze(-1)
                 else:
                     processed_tokens[i][selected_mask[i]] = self.block(
                         selected_tokens.unsqueeze(0),
-                        attention_mask=causal_mask,
+                        attention_mask=current_causal_mask,
                         position_ids=selected_position_ids,
-                        past_key_value=past_key_values,
+                        past_key_value=past_key_value,
                         output_attentions=output_attentions,
                         use_cache=use_cache,
                         **kwargs
                     )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
 
         output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
-        return (output,) if len(output.shape) == 3 else (output.unsqueeze(0),)
+        return (output,cache) if cache_position is not None else (output,)
 
 
 def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedModel:
