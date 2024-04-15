@@ -91,7 +91,7 @@ class MoD(nn.Module):
                     )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
 
         output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
-        return (output,cache) if cache_position is not None else (output,)
+        return (output,cache) if cache is not None else (output,)
 
 
 def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedModel:
