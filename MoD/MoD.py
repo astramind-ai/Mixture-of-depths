@@ -48,6 +48,7 @@ class MoD(nn.Module):
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
         selected_mask = weights > threshold.unsqueeze(-1)
+        cache = None
 
         processed_tokens = torch.zeros_like(x)
         for i in range(b):
@@ -77,7 +78,6 @@ class MoD(nn.Module):
                         processed_tokens[i][selected_mask[i]], cache = block_output
                     else:
                         processed_tokens[i][selected_mask[i]] = block_output[0]
-                        cache = None
                     processed_tokens[i][selected_mask[i]] = processed_tokens[i][selected_mask[i]] * weights[i][selected_mask[i]].unsqueeze(-1)
                 else:
                     processed_tokens[i][selected_mask[i]] = self.block(
@@ -91,7 +91,7 @@ class MoD(nn.Module):
                     )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
 
         output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
-        return (output,cache) if cache is not None else (output,)
+        return (output, cache) if cache is not None else (output,)
 
 
 def apply_mod_to_hf(model: PreTrainedModel, enabled: bool = True) -> PreTrainedModel:
