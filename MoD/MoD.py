@@ -44,10 +44,10 @@ class MoD(nn.Module):
             self.training_step += 1 if self.training_step < 1000 else 999
             self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
 
-        k = int(self.capacity * s)
+        k = max(1, int(self.capacity * s))
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
-        selected_mask = weights > threshold.unsqueeze(-1)
+        selected_mask = weights > threshold.unsqueeze(-1) if k > 1 else weights >= threshold.unsqueeze(-1)
         cache = None
 
         processed_tokens = torch.zeros_like(x)
