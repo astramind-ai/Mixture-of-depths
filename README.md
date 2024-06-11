@@ -59,6 +59,9 @@ from MoD import AutoMoDModelForCausalLM
 # Replace 'path_to_your_model' with the actual path to your model's directory
 model = AutoMoDModelForCausalLM.from_pretrained('path_to_your_model')
 ```
+### Using generate()
+Before calling the hf generate() method please explicitly use eval() on the model
+
 ## 🫱🏼‍🫲🏽 Contributing
 We welcome contributions from the community, whether it's adding new features, improving documentation, or reporting bugs. Please refer to our contribution guidelines before making a pull request.
 
