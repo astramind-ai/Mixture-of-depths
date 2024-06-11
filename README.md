@@ -12,6 +12,7 @@ This is an unofficial implementation for the paper [Mixture-of-Depths: Dynamical
 | Mixtral  |  ✅ |
 | LLama  |  ✅ |
 | LLama2  |  ✅ |
+| LLama3  |  ✅ |
 | Gemma  |  ✅ |
 | BLOOMZ  |  ✅ |
 | BLOOM  |  ✅ |
