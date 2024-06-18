@@ -55,13 +55,6 @@ class MoD(nn.Module):
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
         selected_mask = weights > threshold.unsqueeze(-1) if k > 1 else weights >= threshold.unsqueeze(-1)
-        """if k == 0 and use_cache and past_key_value:
-            #create empty cache entry
-            key_bs, key_nh, _, key_hd = past_key_value.key_cache[-1].size()
-            past_key_value.key_cache.append(torch.zeros((key_bs, key_nh, 0, key_hd), device=x.device, dtype=x.dtype))
-            value_bs, value_nh, _, value_hd = past_key_value.value_cache[-1].size()
-            past_key_value.value_cache.append(torch.zeros((value_bs, value_nh, 0, value_hd), device=x.device, dtype=x.dtype))
-            cache = past_key_value"""
 
         cache = None
 
