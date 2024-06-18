@@ -1,11 +1,12 @@
 # inspired by  https://github.com/kyegomez/Mixture-of-Depths
+import warnings
 
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Any
 
-from transformers import PreTrainedModel
-
+from transformers import PreTrainedModel, DynamicCache
+warnings.simplefilter('once')
 
 
 class TokenRouter(nn.Module):
@@ -14,10 +15,11 @@ class TokenRouter(nn.Module):
         self.weight_predictor = nn.Linear(embed_dim, 1)
 
     def forward(self, x):
-        weights = self.weight_predictor(x).squeeze(
+        original_type = x.dtype
+        weights = self.weight_predictor(x.to(self.weight_predictor.weight.dtype)).squeeze(
             -1
         )  # [batch_size, seq_len]
-        return weights
+        return weights.to(original_type)
 
 
 class MoD(nn.Module):
@@ -32,7 +34,7 @@ class MoD(nn.Module):
                 x: torch.Tensor,
                 attention_mask: torch.Tensor,
                 position_ids: torch.Tensor,
-                past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]],
+                past_key_value: Optional[DynamicCache],
                 output_attentions: bool,
                 use_cache: bool,
                 cache_position: Optional[torch.Tensor] = None,
@@ -40,14 +42,27 @@ class MoD(nn.Module):
                 ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         b, s, d = x.shape
         weights = self.router(x)
+
         if self.router.training:
             self.training_step += 1 if self.training_step < 1000 else 999
             self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
+        else:
+            if torch.isnan(weights).any():
+                raise RuntimeError(
+                    "NaN detected in router weights, this is not intended to happen, please check your model. You can try to use bf16/fp32")
 
-        k = max(1, int(self.capacity * s))
+        k = min(1,int(self.capacity * s))
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
         selected_mask = weights > threshold.unsqueeze(-1) if k > 1 else weights >= threshold.unsqueeze(-1)
+        """if k == 0 and use_cache and past_key_value:
+            #create empty cache entry
+            key_bs, key_nh, _, key_hd = past_key_value.key_cache[-1].size()
+            past_key_value.key_cache.append(torch.zeros((key_bs, key_nh, 0, key_hd), device=x.device, dtype=x.dtype))
+            value_bs, value_nh, _, value_hd = past_key_value.value_cache[-1].size()
+            past_key_value.value_cache.append(torch.zeros((value_bs, value_nh, 0, value_hd), device=x.device, dtype=x.dtype))
+            cache = past_key_value"""
+
         cache = None
 
         processed_tokens = torch.zeros_like(x)
@@ -58,6 +73,7 @@ class MoD(nn.Module):
             if attention_mask is not None:
                 current_causal_mask = attention_mask[i, 0]
                 current_causal_mask = current_causal_mask[current_selected_mask][:, current_selected_mask].unsqueeze(0).unsqueeze(0) #first if for the one second is for the bs
+
             else:
                 current_causal_mask = None
             if selected_tokens.size(0) > 0:
@@ -78,6 +94,7 @@ class MoD(nn.Module):
                         processed_tokens[i][selected_mask[i]], cache = block_output
                     else:
                         processed_tokens[i][selected_mask[i]] = block_output[0]
+
                     processed_tokens[i][selected_mask[i]] = processed_tokens[i][selected_mask[i]] * weights[i][selected_mask[i]].unsqueeze(-1)
                 else:
                     processed_tokens[i][selected_mask[i]] = self.block(
@@ -89,6 +106,8 @@ class MoD(nn.Module):
                         use_cache=use_cache,
                         **kwargs
                     )[0] * weights[i][selected_mask[i]].unsqueeze(-1)
+
+
 
         output = processed_tokens + (x * (~selected_mask).unsqueeze(-1).to(x.dtype))
         return (output, cache) if cache is not None else (output,)
