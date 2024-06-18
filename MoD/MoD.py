@@ -44,12 +44,15 @@ class MoD(nn.Module):
         weights = self.router(x)
 
         if self.router.training:
+            if torch.isnan(weights).any():
+                warnings.warn(
+                    "NaN detected in router weights, this is not intended to happen, please check your model. You can try to use bf16/fp32", RuntimeWarning)
             self.training_step += 1 if self.training_step < 1000 else 999
             self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
         else:
             if torch.isnan(weights).any():
                 raise RuntimeError(
-                    "NaN detected in router weights, this is not intended to happen, please check your model. You can try to use bf16/fp32")
+                    "NaN detected in router weights, this is not intended to happen, please check your model.")
 
         k = min(1,int(self.capacity * s))
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
