@@ -1,4 +1,5 @@
 # inspired by  https://github.com/kyegomez/Mixture-of-Depths
+import logging
 import warnings
 
 import torch
@@ -6,7 +7,9 @@ import torch.nn as nn
 from typing import Optional, Tuple, Any
 
 from transformers import PreTrainedModel, DynamicCache
-warnings.simplefilter('once')
+
+warnings.filterwarnings('once',
+                        message="Attention mask is not 2D, this is not intended to happen, please check your model.")
 
 
 class TokenRouter(nn.Module):
@@ -16,6 +19,7 @@ class TokenRouter(nn.Module):
 
     def forward(self, x):
         original_type = x.dtype
+        self.weight_predictor.to(torch.float32)
         weights = self.weight_predictor(x.to(self.weight_predictor.weight.dtype)).squeeze(
             -1
         )  # [batch_size, seq_len]
@@ -41,20 +45,18 @@ class MoD(nn.Module):
                 **kwargs: Any
                 ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         b, s, d = x.shape
+
         weights = self.router(x)
 
         if self.router.training:
-            if torch.isnan(weights).any():
-                warnings.warn(
-                    "NaN detected in router weights, this is not intended to happen, please check your model. You can try to use bf16/fp32", RuntimeWarning)
             self.training_step += 1 if self.training_step < 1000 else 999
             self.capacity = 0.125 + ((1 - 0.125) * (1. / self.training_step))
-        else:
-            if torch.isnan(weights).any():
-                raise RuntimeError(
-                    "NaN detected in router weights, this is not intended to happen, please check your model.")
 
-        k = min(1,int(self.capacity * s))
+        if torch.isnan(x).any():
+            warnings.warn(
+                "NaN detected in input tokens, this is not intended to happen, please check your model. Before retraining, you could try the model with flash-attn-2 enabled.")
+
+        k = max(1, int(self.capacity * s))
         top_k_values, _ = torch.topk(weights, k, dim=1, sorted=True)
         threshold = top_k_values[:, -1]
         selected_mask = weights > threshold.unsqueeze(-1) if k > 1 else weights >= threshold.unsqueeze(-1)
@@ -67,9 +69,13 @@ class MoD(nn.Module):
             selected_tokens = x[i][current_selected_mask]
             selected_position_ids = position_ids[i][current_selected_mask].unsqueeze(0)
             if attention_mask is not None:
-                current_causal_mask = attention_mask[i, 0]
-                current_causal_mask = current_causal_mask[current_selected_mask][:, current_selected_mask].unsqueeze(0).unsqueeze(0) #first if for the one second is for the bs
-
+                if attention_mask.dim() == 2: #this is the fa2 case
+                    current_causal_mask = attention_mask[:, current_selected_mask]
+                else:
+                    #set wanings once
+                    warnings.warn("SDPA is known to case some issues with MoD, please proceed with caution.")
+                    current_causal_mask = attention_mask[i, 0]
+                    current_causal_mask = current_causal_mask[current_selected_mask][:, current_selected_mask].unsqueeze(0).unsqueeze(0) #first if for the one second is for the bs
             else:
                 current_causal_mask = None
             if selected_tokens.size(0) > 0:
